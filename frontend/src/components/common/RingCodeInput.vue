@@ -1,22 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { COLOR_RING_PRESETS, RING_PREFIXES, type RingRecord } from '../../types/ring-record';
+import { COLOR_RING_PRESETS, ORIGIN_HINT, RING_PREFIXES, type BirdProfile } from '../../types/ring-record';
 
 const props = withDefaults(
   defineProps<{
     ringNo: string;
     colorRing: string;
-    /** 环号已存在时命中的历史记录 */
-    existed?: RingRecord;
-    historyCount?: number;
+    /** 环号已命中的个体主档（续录重捕 / 回收） */
+    bird?: BirdProfile;
+    /** 该主档下已有捕获事件数 */
+    eventCount?: number;
   }>(),
-  { existed: undefined, historyCount: 0 },
+  { bird: undefined, eventCount: 0 },
 );
 
 const emit = defineEmits<{
   (e: 'update:ringNo', value: string): void;
   (e: 'update:colorRing', value: string): void;
-  (e: 'view-history', ringNo: string): void;
+  (e: 'view-profile', birdId: string): void;
 }>();
 
 const prefix = computed(() => {
@@ -67,16 +68,16 @@ function compose(nextPrefix: string, nextSerial: string) {
       <span class="ring-hint">彩环用于野外远距离识别，可与金属环号组合使用</span>
     </div>
     <el-alert
-      v-if="existed"
+      v-if="bird"
       class="ring-alert"
-      type="warning"
+      type="success"
       show-icon
       :closable="false"
-      :title="`环号 ${ringNo} 已存在（${existed.speciesCn} · ${existed.status} · 该环号共 ${historyCount} 条历史记录）`"
-      description="重复环号不允许再次登记初捕；如需记录重捕请改为「重捕」状态，或直接查看历史记录。"
+      :title="`环号 ${ringNo} 已有个体档案（${bird.speciesCn} · ${bird.origin} · 已录 ${eventCount} 次捕获事件）`"
+      :description="`${ORIGIN_HINT[bird.origin]}。保存后本次「重捕 / 回收」将作为新事件挂在同一主档下，鸟种沿用主档。`"
     >
       <template #default>
-        <el-button link type="primary" @click="emit('view-history', ringNo)">查看该环号历史记录</el-button>
+        <el-button link type="primary" @click="emit('view-profile', bird.id)">查看个体档案与全部捕获事件</el-button>
       </template>
     </el-alert>
   </div>

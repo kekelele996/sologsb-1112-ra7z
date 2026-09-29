@@ -34,7 +34,7 @@ export const useMeasureStore = defineStore('measure', {
     morphsOf(state) {
       return (ringId: string): Morphometrics[] => state.morphs.filter((morph) => morph.ringId === ringId);
     },
-    /** 已测量个体数（去重环志记录） */
+    /** 量度记录条数（按捕获事件去重，一次捕获一条量度） */
     measuredRingCount(state): number {
       return new Set(state.morphs.map((morph) => morph.ringId)).size;
     },
@@ -76,6 +76,12 @@ export const useMeasureStore = defineStore('measure', {
     async removeMorph(id: string) {
       await db.morphs.delete(id);
       this.morphs = this.morphs.filter((morph) => morph.id !== id);
+    },
+
+    /** 批量从内存状态移除（捕获事件删除时由 ringStore 级联调用，库内删除已在同一事务完成） */
+    removeMorphs(ids: string[]) {
+      const idSet = new Set(ids);
+      this.morphs = this.morphs.filter((morph) => !idSet.has(morph.id));
     },
   },
 });

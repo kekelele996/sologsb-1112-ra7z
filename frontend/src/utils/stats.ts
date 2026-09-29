@@ -43,7 +43,7 @@ export function speciesOf(ring: RingRecord): { cn: string; sci: string } {
   return { cn: ring.speciesCn, sci: ring.speciesSci };
 }
 
-/** 鸟种计数（按记录数降序） */
+/** 鸟种计数（按捕获事件数降序；同一只鸟重捕多次计多个事件） */
 export function speciesCount(records: RingRecord[]): Array<{ speciesCn: string; speciesSci: string; count: number }> {
   const map = new Map<string, { speciesCn: string; speciesSci: string; count: number }>();
   records.forEach((record) => {
@@ -52,6 +52,11 @@ export function speciesCount(records: RingRecord[]): Array<{ speciesCn: string; 
     map.set(record.speciesCn, item);
   });
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+/** 个体数：同一金属环号（同一主档）只计一个个体 */
+export function individualCount(records: RingRecord[]): number {
+  return new Set(records.map((record) => record.ringNo.trim().toLowerCase())).size;
 }
 
 /** 状态分布 */
@@ -71,7 +76,11 @@ export function recaptureRate(records: RingRecord[]): number {
   return base > 0 ? Number(((recaptured / base) * 100).toFixed(1)) : 0;
 }
 
-/** 批次统计：鸟种数、初捕数与重捕数 */
+/**
+ * 批次统计：
+ * - 鸟种数、初捕/重捕/回收数都按捕获事件计算；
+ * - 个体数按金属环号去重，同一只鸟在本批多次出现只计一个个体。
+ */
 export function buildSessionStats(session: SurveySession, records: RingRecord[], siteName: string): SessionStats {
   const scoped = records.filter((record) => record.sessionId === session.id);
   const breakdown = statusBreakdown(scoped);
@@ -83,6 +92,7 @@ export function buildSessionStats(session: SurveySession, records: RingRecord[],
     firstCount: breakdown.初捕,
     recaptureCount: breakdown.重捕,
     recoveryCount: breakdown.回收,
+    individualCount: new Set(scoped.map((record) => record.ringNo.trim().toLowerCase())).size,
     recaptureRate: base > 0 ? Number(((breakdown.重捕 / base) * 100).toFixed(1)) : 0,
   };
 }

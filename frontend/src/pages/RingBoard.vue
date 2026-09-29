@@ -43,16 +43,19 @@ function selectSite(siteId: string) {
     </p>
 
     <el-row :gutter="12" class="stat-row">
-      <el-col :xs="12" :md="6">
-        <StatBadge label="环志记录" :value="ringStore.rings.length" unit="条" />
+      <el-col :xs="12" :sm="8" class="stat-col">
+        <StatBadge label="个体主档" :value="ringStore.birds.length" unit="只" status="success" />
       </el-col>
-      <el-col :xs="12" :md="6">
-        <StatBadge label="鸟种数" :value="speciesList.length" unit="种" status="success" />
+      <el-col :xs="12" :sm="8" class="stat-col">
+        <StatBadge label="捕获事件" :value="ringStore.rings.length" unit="次" />
       </el-col>
-      <el-col :xs="12" :md="6">
+      <el-col :xs="12" :sm="8" class="stat-col">
+        <StatBadge label="鸟种数" :value="speciesList.length" unit="种" />
+      </el-col>
+      <el-col :xs="12" :sm="12" class="stat-col">
         <StatBadge label="初捕 / 重捕 / 回收" :value="`${breakdown.初捕} / ${breakdown.重捕} / ${breakdown.回收}`" />
       </el-col>
-      <el-col :xs="12" :md="6">
+      <el-col :xs="12" :sm="12" class="stat-col">
         <StatBadge label="重捕率" :value="recaptureRate(ringStore.rings)" unit="%" status="warning" hint="重捕 / (初捕 + 重捕)" />
       </el-col>
     </el-row>
@@ -89,7 +92,7 @@ function selectSite(siteId: string) {
           <el-table :data="speciesList" size="small" border max-height="280">
             <el-table-column prop="speciesCn" label="鸟种" width="110" />
             <el-table-column prop="speciesSci" label="学名" show-overflow-tooltip />
-            <el-table-column prop="count" label="记录数" width="80" align="right" />
+            <el-table-column prop="count" label="事件数" width="80" align="right" />
           </el-table>
         </el-card>
 
@@ -104,8 +107,8 @@ function selectSite(siteId: string) {
         <el-card shadow="never" class="block">
           <template #header>
             <div class="card-head">
-              <span>最近环志</span>
-              <span class="card-note">已量度 {{ measureStore.measuredRingCount }} 只</span>
+              <span>最近捕获</span>
+              <span class="card-note">量度 {{ measureStore.measuredRingCount }} 条</span>
             </div>
           </template>
           <div v-for="record in recent" :key="record.id" class="recent-row">
@@ -138,6 +141,12 @@ function selectSite(siteId: string) {
 }
 .stat-row .el-col {
   margin-bottom: 12px;
+}
+@media (min-width: 992px) {
+  .stat-row .stat-col {
+    max-width: 20%;
+    flex: 0 0 20%;
+  }
 }
 .block {
   margin-bottom: 16px;

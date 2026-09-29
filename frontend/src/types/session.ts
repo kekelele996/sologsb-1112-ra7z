@@ -37,6 +37,8 @@ export interface SessionStats {
   recaptureCount: number;
   /** 回收数 */
   recoveryCount: number;
+  /** 个体数（同一环号去重，同一只鸟只计一个个体） */
+  individualCount: number;
   /** 重捕率（%，重捕 / (初捕 + 重捕)） */
   recaptureRate: number;
 }

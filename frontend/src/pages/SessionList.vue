@@ -141,7 +141,7 @@ async function submit() {
 async function close(session: SurveySession) {
   const stats = buildSessionStats(session, ringStore.rings, siteStore.siteName(session.siteId));
   const confirmed = await ElMessageBox.confirm(
-    `关闭批次 ${session.sessionNo} 后出统计：鸟种 ${stats.speciesCount} 种、初捕 ${stats.firstCount}、重捕 ${stats.recaptureCount}。确认关闭？`,
+    `关闭批次 ${session.sessionNo} 后出统计：鸟种 ${stats.speciesCount} 种、个体 ${stats.individualCount} 只、初捕 ${stats.firstCount}、重捕 ${stats.recaptureCount}。确认关闭？`,
     '关闭批次',
     { type: 'warning' },
   )
@@ -165,7 +165,7 @@ async function remove(session: SurveySession) {
 <template>
   <div>
     <h2 class="page-title">调查批次与观测条件</h2>
-    <p class="page-desc">登记批次号、鸟点、起止时间与云量风力；批次关闭后统计该批鸟种数、初捕数与重捕数。</p>
+    <p class="page-desc">登记批次号、鸟点、起止时间与云量风力；批次关闭后按捕获事件统计鸟种数与初捕 / 重捕 / 回收次数，同一只鸟去重计一个个体。</p>
 
     <div class="toolbar">
       <el-button type="primary" @click="openCreate">新建批次</el-button>
@@ -223,6 +223,9 @@ async function remove(session: SurveySession) {
         </el-table-column>
         <el-table-column label="鸟种数" width="90" align="right">
           <template #default="scope">{{ scope.row.speciesCount }}</template>
+        </el-table-column>
+        <el-table-column label="个体数" width="90" align="right">
+          <template #default="scope">{{ scope.row.individualCount }}</template>
         </el-table-column>
         <el-table-column label="初捕 / 重捕 / 回收" width="160">
           <template #default="scope">{{ scope.row.firstCount }} / {{ scope.row.recaptureCount }} / {{ scope.row.recoveryCount }}</template>
@@ -298,9 +301,10 @@ async function remove(session: SurveySession) {
             {{ cloudText(detail.session.cloudCover) }} · {{ detail.session.windForce }} 级风
           </el-descriptions-item>
           <el-descriptions-item label="鸟种数">{{ detail.speciesCount }} 种</el-descriptions-item>
-          <el-descriptions-item label="初捕">{{ detail.firstCount }} 只</el-descriptions-item>
-          <el-descriptions-item label="重捕">{{ detail.recaptureCount }} 只</el-descriptions-item>
-          <el-descriptions-item label="回收">{{ detail.recoveryCount }} 只</el-descriptions-item>
+          <el-descriptions-item label="个体数">{{ detail.individualCount }} 只</el-descriptions-item>
+          <el-descriptions-item label="初捕">{{ detail.firstCount }} 只次</el-descriptions-item>
+          <el-descriptions-item label="重捕">{{ detail.recaptureCount }} 只次</el-descriptions-item>
+          <el-descriptions-item label="回收">{{ detail.recoveryCount }} 只次</el-descriptions-item>
           <el-descriptions-item label="重捕率">{{ detail.recaptureRate }}%</el-descriptions-item>
           <el-descriptions-item label="主调查人">{{ detail.session.leader }}</el-descriptions-item>
         </el-descriptions>

@@ -10,7 +10,7 @@ export type MeasureKey =
 /** 量度测量记录 */
 export interface Morphometrics {
   id: string;
-  /** 关联环志记录 */
+  /** 关联捕获事件 id（量度挂在具体捕获事件上，重捕可单独量度） */
   ringId: string;
   /** 喙长（mm） */
   billLength: number;

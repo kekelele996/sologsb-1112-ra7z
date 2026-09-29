@@ -1,9 +1,10 @@
 import { db } from './db';
 import type { BirdSite } from '../types/bird-site';
 import type { SurveySession } from '../types/session';
-import type { RingRecord } from '../types/ring-record';
+import type { BirdProfile, RingRecord } from '../types/ring-record';
 import type { Morphometrics } from '../types/morphometrics';
 import { SPECIES_CATALOG } from './stats';
+import { buildBirdFromEvents, normalizeRingNo } from './birds';
 
 const DAY = 86_400_000;
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
@@ -26,6 +27,9 @@ export const SEED_SESSIONS: SurveySession[] = [
   { id: 'session-004', sessionNo: '2024-A04', date: dateDaysAgo(2), siteId: 'site-001', startedAt: '05:30', endedAt: '11:00', netRounds: 6, cloudCover: 8, windForce: 4, closed: false, leader: '郑海', remark: '风力偏大，网次仅完成 4 次' },
 ];
 
+/** 捕获事件原始行（birdId 由 buildSeedBirds 按环号归组回填，与线上 v3 迁移逻辑一致） */
+type SeedRingEvent = Omit<RingRecord, 'birdId'>;
+
 function ring(
   index: number,
   ringNo: string,
@@ -40,7 +44,7 @@ function ring(
   ringer: string,
   days: number,
   remark?: string,
-): RingRecord {
+): SeedRingEvent {
   return {
     id: `ring-${String(index).padStart(3, '0')}`,
     ringNo,
@@ -59,7 +63,7 @@ function ring(
   };
 }
 
-export const SEED_RINGS: RingRecord[] = [
+const SEED_RING_EVENTS: SeedRingEvent[] = [
   ring(1, 'A-10231', '红-黄', '红喉歌鸲', '成', 'session-001', 'site-001', '3 号网', 2, '初捕', '韩雪', 21),
   ring(2, 'A-10232', '无', '黄眉柳莺', '幼', 'session-001', 'site-001', '5 号网', 2, '初捕', '韩雪', 21),
   ring(3, 'A-10233', '蓝-白', '震旦鸦雀', '成', 'session-001', 'site-001', '7 号网', 3, '初捕', '韩雪', 21, '芦苇丛中捕获，本地留鸟'),
@@ -79,6 +83,34 @@ export const SEED_RINGS: RingRecord[] = [
   ring(17, 'A-10099', '无', '红喉歌鸲', '成', 'session-004', 'site-001', '3 号网', 3, '回收', '郑海', 2, '回收自外站环志个体'),
   ring(18, 'C-30103', '无', '黄鹡鸰', '幼', 'session-004', 'site-001', '6 号网', 4, '初捕', '韩雪', 2),
 ];
+
+/** 由事件按环号归组生成个体主档，并把 birdId 回填到事件（同环号初捕 + 重捕自动归入一条个体链） */
+function buildSeedBirds(events: SeedRingEvent[]): { birds: BirdProfile[]; rings: RingRecord[] } {
+  const groups = new Map<string, SeedRingEvent[]>();
+  events.forEach((event) => {
+    const key = normalizeRingNo(event.ringNo);
+    const list = groups.get(key) ?? [];
+    list.push(event);
+    groups.set(key, list);
+  });
+
+  const birds: BirdProfile[] = [];
+  const rings: RingRecord[] = [];
+  // 稳定主档 id：seed 数据固定用 bird-序号，避免每次新库 id 漂移
+  let birdIndex = 0;
+  groups.forEach((groupEvents) => {
+    birdIndex += 1;
+    const bird = buildBirdFromEvents(groupEvents as RingRecord[]);
+    bird.id = `bird-${String(birdIndex).padStart(3, '0')}`;
+    birds.push(bird);
+    groupEvents.forEach((event) => rings.push({ ...event, birdId: bird.id }));
+  });
+  return { birds, rings };
+}
+
+const SEED_CHAIN = buildSeedBirds(SEED_RING_EVENTS);
+export const SEED_BIRDS: BirdProfile[] = SEED_CHAIN.birds;
+export const SEED_RINGS: RingRecord[] = SEED_CHAIN.rings;
 
 function morph(
   index: number,
@@ -131,16 +163,18 @@ export async function seedIfEmpty(): Promise<void> {
   if (flag) {
     return;
   }
-  const [ringCount, morphCount, siteCount, sessionCount] = await Promise.all([
+  const [ringCount, morphCount, siteCount, sessionCount, birdCount] = await Promise.all([
     db.rings.count(),
     db.morphs.count(),
     db.sites.count(),
     db.sessions.count(),
+    db.birds.count(),
   ]);
 
-  await db.transaction('rw', db.rings, db.morphs, db.sites, db.sessions, db.meta, async () => {
+  await db.transaction('rw', [db.rings, db.morphs, db.sites, db.sessions, db.birds, db.meta], async () => {
     if (siteCount === 0) await db.sites.bulkPut(SEED_SITES);
     if (sessionCount === 0) await db.sessions.bulkPut(SEED_SESSIONS);
+    if (birdCount === 0) await db.birds.bulkPut(SEED_BIRDS);
     if (ringCount === 0) await db.rings.bulkPut(SEED_RINGS);
     if (morphCount === 0) await db.morphs.bulkPut(SEED_MORPHS);
     await db.meta.put({ key: 'seeded', value: new Date().toISOString() });

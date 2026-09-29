@@ -8,7 +8,7 @@ import { useRingStore } from '../stores/ringStore';
 import { useMeasureStore } from '../stores/measureStore';
 import { MEASURE_FIELDS, type MeasureKey, type Morphometrics } from '../types/morphometrics';
 import { deviationsOf, measureMeans } from '../utils/stats';
-import { formatDateTime } from '../utils/format';
+import { formatDate, formatDateTime } from '../utils/format';
 
 const ringStore = useRingStore();
 const measureStore = useMeasureStore();
@@ -43,7 +43,11 @@ const rules: FormRules = {
 };
 
 const ringOptions = computed(() =>
-  ringStore.rings.map((record) => ({ label: `${record.ringNo} · ${record.speciesCn} · ${record.netNo}`, value: record.id })),
+  ringStore.rings.map((record) => ({
+    // 同一只鸟重捕多次时，按日期与状态区分具体捕获事件
+    label: `${record.ringNo} · ${record.speciesCn} · ${record.status} · ${formatDate(record.ringDate)} · ${record.netNo}`,
+    value: record.id,
+  })),
 );
 
 const selectedRing = computed(() => ringStore.rings.find((record) => record.id === selectedRingId.value));
@@ -109,7 +113,7 @@ watch(selectedRing, (ring) => {
 
 function openCreate() {
   if (!selectedRing.value) {
-    ElMessage.warning('请先选择一条环志记录');
+    ElMessage.warning('请先选择一条捕获事件');
     return;
   }
   editingId.value = '';
@@ -149,7 +153,7 @@ async function submit() {
   const ok = await formRef.value?.validate().catch(() => false);
   if (!ok) return;
   if (!selectedRing.value) {
-    ElMessage.warning('请先选择一条环志记录');
+    ElMessage.warning('请先选择一条捕获事件');
     return;
   }
   const payload = {
@@ -192,12 +196,14 @@ async function remove(morph: Morphometrics) {
 <template>
   <div>
     <h2 class="page-title">量度测量录入</h2>
-    <p class="page-desc">喙长 / 喙宽 / 翅长（自然弦长）/ 尾长 / 跗跖长 / 体重带单位与范围校验，并与同鸟种历史均值比对给出偏离提示。</p>
+    <p class="page-desc">
+      量度挂在具体捕获事件上：同一只鸟重捕可分别量度。喙长 / 喙宽 / 翅长（自然弦长）/ 尾长 / 跗跖长 / 体重带单位与范围校验，并与同鸟种历史均值比对给出偏离提示。
+    </p>
 
     <el-card shadow="never" class="block">
       <div class="head-row">
-        <span class="head-label">选择环志记录</span>
-        <el-select v-model="selectedRingId" filterable placeholder="按环号 / 鸟种搜索" style="width: 320px">
+        <span class="head-label">选择捕获事件</span>
+        <el-select v-model="selectedRingId" filterable placeholder="按环号 / 鸟种 / 日期搜索" style="width: 380px">
           <el-option v-for="item in ringOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-button type="primary" :disabled="!selectedRing" @click="openCreate">录入量度</el-button>
