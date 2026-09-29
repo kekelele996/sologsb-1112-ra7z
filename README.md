@@ -25,7 +25,7 @@ docker compose down
 | 构建 | Vite 6（`npm run build` 含 `vue-tsc --noEmit` 类型检查） |
 | UI | Element Plus 2 |
 | 路由 | Vue Router 4（5 条业务路由 + 404） |
-| 状态 | Pinia（ringStore / measureStore / siteStore / sessionStore） |
+| 状态 | Pinia（birdStore / ringStore / measureStore / siteStore / sessionStore） |
 | 地图 | 高德地图 JS API（可选，按需动态加载）+ 本地 SVG 网格退化视图 |
 | 存储 | IndexedDB（Dexie，库名 `gbbirdring-db`） |
 | 托管 | nginx:alpine（多阶段构建，SPA try_files + gzip） |
@@ -68,15 +68,18 @@ npm run build    # 类型检查 + 生产构建
 
 | 路由 | 页面 | 说明 |
 | --- | --- | --- |
-| `/` | 统计台 | 鸟种数、初捕/重捕比、鸟点分布图、鸟种计数与生境分布 |
-| `/rings` | 环志记录 | 金属环号 + 彩环双段录入与自动查重，重复时提示并跳转历史记录 |
-| `/measure` | 量度测量 | 6 项量度带单位与范围校验，与同鸟种历史均值比对给出偏离提示 |
+| `/` | 统计台 | 个体数 / 捕获事件数、初捕/重捕比、鸟点分布图、鸟种个体数与捕获数、生境分布 |
+| `/rings` | 个体档案 | 一只鸟一个主档：环号首次出现（含站外回收）建档，重捕/回收作为捕获事件续录，误删事件主档保留 |
+| `/measure` | 量度测量 | 量度挂在每次捕获事件上，6 项量度带单位与范围校验，与同鸟种历史均值比对给出偏离提示 |
 | `/sites` | 鸟点台账 | 地图 / SVG 网格双模式切换，表单拾取坐标即时落点，点位间距提示 |
-| `/sessions` | 调查批次 | 观测条件录入，关闭批次后统计鸟种数、初捕数与重捕数 |
+| `/sessions` | 调查批次 | 观测条件录入，关闭批次后统计鸟种数、初捕/重捕/回收与去重个体数 |
 
 ## 数据存储说明
 
-- 全部数据存于浏览器 IndexedDB（Dexie，库名 `gbbirdring-db`），表：`rings`、`morphs`、`sites`、`sessions`、`meta`。
-- `db.version(1)` 建表声明索引；`db.version(2).upgrade(...)` 为环志表增加 `[speciesCn+ringDate]` 复合索引并回填历史彩环字段。升级前可用顶栏「导出备份」导出全量 JSON。
-- 首次打开且表为空时写入示例数据（6 个鸟点、4 个调查批次、18 条环志记录与 14 条量度）。
+- 全部数据存于浏览器 IndexedDB（Dexie，库名 `gbbirdring-db`），表：`birds`、`rings`、`morphs`、`sites`、`sessions`、`meta`。
+- 数据模型为「一只鸟一个主档」：`birds` 是个体主档（环号首次出现即建档），`rings` 是捕获事件（初捕 / 重捕 / 回收），每条事件以 `birdId` 挂在主档下，`morphs` 量度挂在具体捕获事件上。
+- `db.version(1)` 建表声明索引；`version(2)` 为环志表增加 `[speciesCn+ringDate]` 复合索引并回填历史彩环字段；`version(3)` 新增 `birds` 主档表、给 `rings` 加 `birdId` 索引，并把历史数据按金属环号自动归入同一条个体链（同环号的初捕/重捕合并，仅重捕、站外回收无本地初捕也建档）。升级前可用顶栏「导出备份」导出全量 JSON。
+- 删除保护：删除一条捕获事件只删该事件及其量度，个体主档与其他事件完整保留；有事件历史的主档受保护不能直接删，仅事件清空后的空主档可手动删除。
+- 批次统计中鸟种数与初捕/重捕/回收数按捕获事件计算，个体数按主档（`birdId`）去重，同一只鸟在一批内多次出现只计一个个体。
+- 首次打开且表为空时写入示例数据（6 个鸟点、4 个调查批次、17 只个体 / 18 条捕获事件与 15 条量度，含同环号跨点重捕与站外回收）。
 - 容器无状态：不使用数据库服务、不挂载命名卷，`docker compose down` 后数据仍留在浏览器中。

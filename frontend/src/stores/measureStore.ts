@@ -34,7 +34,7 @@ export const useMeasureStore = defineStore('measure', {
     morphsOf(state) {
       return (ringId: string): Morphometrics[] => state.morphs.filter((morph) => morph.ringId === ringId);
     },
-    /** 已测量个体数（去重环志记录） */
+    /** 已测量事件数（每条捕获事件可独立挂量度） */
     measuredRingCount(state): number {
       return new Set(state.morphs.map((morph) => morph.ringId)).size;
     },
@@ -44,6 +44,11 @@ export const useMeasureStore = defineStore('measure', {
     async hydrate() {
       this.morphs = await db.morphs.orderBy('measuredAt').reverse().toArray();
       this.hydrated = true;
+    },
+
+    /** 捕获事件删除后，从内存中同步摘掉该事件的量度（库内由 ringStore 事务删除） */
+    pruneForRing(ringId: string) {
+      this.morphs = this.morphs.filter((morph) => morph.ringId !== ringId);
     },
 
     async addMorph(input: MorphInput): Promise<Morphometrics> {

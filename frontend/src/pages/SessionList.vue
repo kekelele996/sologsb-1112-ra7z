@@ -8,6 +8,7 @@ import EmptyPanel from '../components/common/EmptyPanel.vue';
 import { useSessionStore } from '../stores/sessionStore';
 import { useSiteStore } from '../stores/siteStore';
 import { useRingStore } from '../stores/ringStore';
+import { useBirdStore } from '../stores/birdStore';
 import { cloudText, type SessionStats, type SurveySession } from '../types/session';
 import { buildSessionStats } from '../utils/stats';
 
@@ -15,6 +16,7 @@ const route = useRoute();
 const sessionStore = useSessionStore();
 const siteStore = useSiteStore();
 const ringStore = useRingStore();
+const birdStore = useBirdStore();
 
 const dialogVisible = ref(false);
 const editingId = ref('');
@@ -74,7 +76,7 @@ const averageRecapture = computed(() => {
   if (list.length === 0) return 0;
   return Number((list.reduce((sum, item) => sum + item.recaptureRate, 0) / list.length).toFixed(1));
 });
-const totalSpecies = computed(() => new Set(ringStore.rings.map((record) => record.speciesCn)).size);
+const totalSpecies = computed(() => new Set(birdStore.birds.map((bird) => bird.speciesCn)).size);
 
 const detail = computed(() => statsList.value.find((item) => item.session.id === detailId.value));
 
@@ -227,6 +229,13 @@ async function remove(session: SurveySession) {
         <el-table-column label="初捕 / 重捕 / 回收" width="160">
           <template #default="scope">{{ scope.row.firstCount }} / {{ scope.row.recaptureCount }} / {{ scope.row.recoveryCount }}</template>
         </el-table-column>
+        <el-table-column label="个体数" width="90" align="right">
+          <template #default="scope">
+            <el-tooltip content="按个体主档去重：同一只鸟本批多次出现只计一个" placement="top">
+              <span>{{ scope.row.individualCount }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
         <el-table-column label="重捕率" width="100" align="right">
           <template #default="scope">{{ scope.row.recaptureRate }}%</template>
         </el-table-column>
@@ -298,9 +307,11 @@ async function remove(session: SurveySession) {
             {{ cloudText(detail.session.cloudCover) }} · {{ detail.session.windForce }} 级风
           </el-descriptions-item>
           <el-descriptions-item label="鸟种数">{{ detail.speciesCount }} 种</el-descriptions-item>
+          <el-descriptions-item label="捕获事件数">{{ detail.firstCount + detail.recaptureCount + detail.recoveryCount }} 次</el-descriptions-item>
           <el-descriptions-item label="初捕">{{ detail.firstCount }} 只</el-descriptions-item>
           <el-descriptions-item label="重捕">{{ detail.recaptureCount }} 只</el-descriptions-item>
           <el-descriptions-item label="回收">{{ detail.recoveryCount }} 只</el-descriptions-item>
+          <el-descriptions-item label="个体数">{{ detail.individualCount }} 只</el-descriptions-item>
           <el-descriptions-item label="重捕率">{{ detail.recaptureRate }}%</el-descriptions-item>
           <el-descriptions-item label="主调查人">{{ detail.session.leader }}</el-descriptions-item>
         </el-descriptions>

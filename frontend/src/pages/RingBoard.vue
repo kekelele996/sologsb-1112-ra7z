@@ -5,15 +5,17 @@ import StatBadge from '../components/common/StatBadge.vue';
 import SiteMap from '../components/common/SiteMap.vue';
 import FilterBar from '../components/common/FilterBar.vue';
 import { useSiteFilter } from '../hooks/useSiteFilter';
+import { useBirdStore } from '../stores/birdStore';
 import { useRingStore } from '../stores/ringStore';
 import { useSiteStore } from '../stores/siteStore';
 import { useMeasureStore } from '../stores/measureStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { HABITATS, type BirdSite } from '../types/bird-site';
+import { HABITATS } from '../types/bird-site';
 import { recaptureRate, speciesCount, statusBreakdown } from '../utils/stats';
 import { sitesByHabitat } from '../utils/geo';
 
 const router = useRouter();
+const birdStore = useBirdStore();
 const ringStore = useRingStore();
 const siteStore = useSiteStore();
 const measureStore = useMeasureStore();
@@ -22,7 +24,7 @@ const filter = useSiteFilter();
 
 const visibleSites = computed(() => filter.apply(siteStore.sites, sessionStore.sessions));
 const breakdown = computed(() => statusBreakdown(ringStore.rings));
-const speciesList = computed(() => speciesCount(ringStore.rings));
+const speciesList = computed(() => speciesCount(ringStore.rings, birdStore.birds));
 const habitatStats = computed(() => sitesByHabitat(siteStore.sites));
 const recent = computed(() => ringStore.rings.slice(0, 6));
 const siteNameOf = (siteId: string) => siteStore.siteName(siteId);
@@ -44,7 +46,7 @@ function selectSite(siteId: string) {
 
     <el-row :gutter="12" class="stat-row">
       <el-col :xs="12" :md="6">
-        <StatBadge label="环志记录" :value="ringStore.rings.length" unit="条" />
+        <StatBadge label="个体 / 捕获事件" :value="`${birdStore.birds.length} / ${ringStore.rings.length}`" unit="只 / 次" />
       </el-col>
       <el-col :xs="12" :md="6">
         <StatBadge label="鸟种数" :value="speciesList.length" unit="种" status="success" />
@@ -89,7 +91,8 @@ function selectSite(siteId: string) {
           <el-table :data="speciesList" size="small" border max-height="280">
             <el-table-column prop="speciesCn" label="鸟种" width="110" />
             <el-table-column prop="speciesSci" label="学名" show-overflow-tooltip />
-            <el-table-column prop="count" label="记录数" width="80" align="right" />
+            <el-table-column prop="individualCount" label="个体数" width="80" align="right" />
+            <el-table-column prop="eventCount" label="捕获数" width="80" align="right" />
           </el-table>
         </el-card>
 

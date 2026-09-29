@@ -1,22 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { COLOR_RING_PRESETS, RING_PREFIXES, type RingRecord } from '../../types/ring-record';
+import { COLOR_RING_PRESETS, RING_PREFIXES } from '../../types/ring-record';
+import type { Bird } from '../../types/bird';
 
 const props = withDefaults(
   defineProps<{
     ringNo: string;
     colorRing: string;
-    /** 环号已存在时命中的历史记录 */
-    existed?: RingRecord;
-    historyCount?: number;
+    /** create：登记新事件（命中主档时续录到同一主档）；edit：编辑既有事件 */
+    mode?: 'create' | 'edit';
+    /** 环号命中的既有个体主档 */
+    matchedBird?: Bird;
   }>(),
-  { existed: undefined, historyCount: 0 },
+  { mode: 'create', matchedBird: undefined },
 );
 
 const emit = defineEmits<{
   (e: 'update:ringNo', value: string): void;
   (e: 'update:colorRing', value: string): void;
-  (e: 'view-history', ringNo: string): void;
 }>();
 
 const prefix = computed(() => {
@@ -67,18 +68,23 @@ function compose(nextPrefix: string, nextSerial: string) {
       <span class="ring-hint">彩环用于野外远距离识别，可与金属环号组合使用</span>
     </div>
     <el-alert
-      v-if="existed"
+      v-if="mode === 'create' && matchedBird"
       class="ring-alert"
-      type="warning"
+      type="success"
       show-icon
       :closable="false"
-      :title="`环号 ${ringNo} 已存在（${existed.speciesCn} · ${existed.status} · 该环号共 ${historyCount} 条历史记录）`"
-      description="重复环号不允许再次登记初捕；如需记录重捕请改为「重捕」状态，或直接查看历史记录。"
-    >
-      <template #default>
-        <el-button link type="primary" @click="emit('view-history', ringNo)">查看该环号历史记录</el-button>
-      </template>
-    </el-alert>
+      :title="`环号 ${ringNo} 已有个体主档（${matchedBird.speciesCn} · 已记录 ${matchedBird.eventCount} 次捕获）`"
+      description="本次保存会作为新的捕获事件（重捕 / 回收）续录到同一只鸟的主档下，不会另建档案；站外回收没有本地初捕时也可直接建档。"
+    />
+    <el-alert
+      v-else-if="mode === 'create'"
+      class="ring-alert"
+      type="info"
+      show-icon
+      :closable="false"
+      title="该环号首次出现，保存时将建立个体主档"
+      description="初捕、仅重捕或站外回收都可以建档；之后同环号的捕获事件都会挂到这一条个体链。"
+    />
   </div>
 </template>
 

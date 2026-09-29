@@ -2,6 +2,7 @@ import { db } from './db';
 import type { BirdSite } from '../types/bird-site';
 import type { SurveySession } from '../types/session';
 import type { RingRecord } from '../types/ring-record';
+import type { Bird } from '../types/bird';
 import type { Morphometrics } from '../types/morphometrics';
 import { SPECIES_CATALOG } from './stats';
 
@@ -43,6 +44,7 @@ function ring(
 ): RingRecord {
   return {
     id: `ring-${String(index).padStart(3, '0')}`,
+    birdId: '',
     ringNo,
     colorRing,
     speciesCn,
@@ -79,6 +81,48 @@ export const SEED_RINGS: RingRecord[] = [
   ring(17, 'A-10099', '无', '红喉歌鸲', '成', 'session-004', 'site-001', '3 号网', 3, '回收', '郑海', 2, '回收自外站环志个体'),
   ring(18, 'C-30103', '无', '黄鹡鸰', '幼', 'session-004', 'site-001', '6 号网', 4, '初捕', '韩雪', 2),
 ];
+
+/**
+ * 由捕获事件派生个体主档：环号首次出现（含仅重捕 / 站外回收）即建档，
+ * 同一环号的初捕 / 重捕 / 回收归入同一条个体链。
+ */
+function buildSeedBirds(events: RingRecord[]): Bird[] {
+  const byRingNo = new Map<string, RingRecord[]>();
+  events.forEach((event) => {
+    const list = byRingNo.get(event.ringNo) ?? [];
+    list.push(event);
+    byRingNo.set(event.ringNo, list);
+  });
+
+  const birds: Bird[] = [];
+  const now = new Date().toISOString();
+  byRingNo.forEach((list, ringNo) => {
+    const sorted = [...list].sort((a, b) => a.ringDate.localeCompare(b.ringDate));
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    // 主档 id 与最早事件 id 绑定，便于从事件反查个体
+    const birdId = `bird-${first.id.replace(/^ring-/, '')}`;
+    list.forEach((event) => {
+      event.birdId = birdId;
+    });
+    birds.push({
+      id: birdId,
+      ringNo,
+      colorRing: last.colorRing || '无',
+      speciesCn: last.speciesCn,
+      speciesSci: last.speciesSci,
+      age: last.age,
+      firstDate: first.ringDate,
+      lastDate: last.ringDate,
+      eventCount: sorted.length,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+  return birds;
+}
+
+export const SEED_BIRDS: Bird[] = buildSeedBirds(SEED_RINGS);
 
 function morph(
   index: number,
@@ -123,6 +167,8 @@ export const SEED_MORPHS: Morphometrics[] = [
   morph(12, 'ring-012', 9.0, 3.2, 62.4, 53.6, 17.2, 10.4, 2, '韩雪', 7),
   morph(13, 'ring-015', 11.2, 3.8, 75.4, 65.2, 19.6, 21.4, 3, '郑海', 2),
   morph(14, 'ring-016', 12.6, 3.9, 78.2, 62.4, 22.0, 16.8, 2, '郑海', 2),
+  // A-10231 跨点重捕时的再次量度，挂在重捕事件（ring-014）下，与初捕量度（morph-001）同属一只鸟
+  morph(15, 'ring-014', 14.4, 4.2, 74.8, 58.0, 23.6, 24.1, 3, '郑海', 7),
 ];
 
 /** 首次打开（表内无数据）时写入示例数据；已有数据则不动 */
@@ -138,10 +184,13 @@ export async function seedIfEmpty(): Promise<void> {
     db.sessions.count(),
   ]);
 
-  await db.transaction('rw', db.rings, db.morphs, db.sites, db.sessions, db.meta, async () => {
+  await db.transaction('rw', [db.rings, db.morphs, db.sites, db.sessions, db.birds, db.meta], async () => {
     if (siteCount === 0) await db.sites.bulkPut(SEED_SITES);
     if (sessionCount === 0) await db.sessions.bulkPut(SEED_SESSIONS);
-    if (ringCount === 0) await db.rings.bulkPut(SEED_RINGS);
+    if (ringCount === 0) {
+      await db.rings.bulkPut(SEED_RINGS);
+      await db.birds.bulkPut(SEED_BIRDS);
+    }
     if (morphCount === 0) await db.morphs.bulkPut(SEED_MORPHS);
     await db.meta.put({ key: 'seeded', value: new Date().toISOString() });
   });

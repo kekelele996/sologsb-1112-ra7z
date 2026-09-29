@@ -1,21 +1,26 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import MeasureInput from '../components/common/MeasureInput.vue';
 import SpeciesPicker from '../components/common/SpeciesPicker.vue';
 import EmptyPanel from '../components/common/EmptyPanel.vue';
 import { useRingStore } from '../stores/ringStore';
 import { useMeasureStore } from '../stores/measureStore';
+import { useSiteStore } from '../stores/siteStore';
 import { MEASURE_FIELDS, type MeasureKey, type Morphometrics } from '../types/morphometrics';
 import { deviationsOf, measureMeans } from '../utils/stats';
-import { formatDateTime } from '../utils/format';
+import { formatDate, formatDateTime } from '../utils/format';
 
+const route = useRoute();
 const ringStore = useRingStore();
 const measureStore = useMeasureStore();
+const siteStore = useSiteStore();
 
-const selectedRingId = ref(ringStore.rings[0]?.id ?? '');
-const speciesCn = ref(ringStore.rings[0]?.speciesCn ?? '红喉歌鸲');
-const speciesSci = ref(ringStore.rings[0]?.speciesSci ?? 'Calliope calliope');
+const queryRingId = typeof route.query.ringId === 'string' ? route.query.ringId : '';
+const selectedRingId = ref(ringStore.rings.some((record) => record.id === queryRingId) ? queryRingId : ringStore.rings[0]?.id ?? '');
+const speciesCn = ref(ringStore.rings.find((record) => record.id === selectedRingId.value)?.speciesCn ?? '红喉歌鸲');
+const speciesSci = ref(ringStore.rings.find((record) => record.id === selectedRingId.value)?.speciesSci ?? 'Calliope calliope');
 const dialogVisible = ref(false);
 const editingId = ref('');
 const formRef = ref<FormInstance>();
@@ -43,10 +48,26 @@ const rules: FormRules = {
 };
 
 const ringOptions = computed(() =>
-  ringStore.rings.map((record) => ({ label: `${record.ringNo} · ${record.speciesCn} · ${record.netNo}`, value: record.id })),
+  ringStore.rings.map((record) => ({
+    label: `${record.ringNo} · ${record.speciesCn} · ${record.status} · ${formatDate(record.ringDate)} · ${record.netNo}`,
+    value: record.id,
+  })),
 );
 
 const selectedRing = computed(() => ringStore.rings.find((record) => record.id === selectedRingId.value));
+
+// 组件可能早于本地数据装载完成而挂载：hydrate 后按 ?ringId= 预选对应捕获事件
+watch(
+  () => ringStore.hydrated,
+  (hydrated) => {
+    if (!hydrated) return;
+    if (queryRingId && ringStore.rings.some((record) => record.id === queryRingId)) {
+      selectedRingId.value = queryRingId;
+    } else if (!ringStore.rings.some((record) => record.id === selectedRingId.value)) {
+      selectedRingId.value = ringStore.rings[0]?.id ?? '';
+    }
+  },
+);
 
 const meansBySpecies = computed(() => measureMeans(ringStore.rings, measureStore.morphs));
 const currentMeans = computed(() => meansBySpecies.value[speciesCn.value]);

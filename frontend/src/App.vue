@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus';
 import { Download } from '@element-plus/icons-vue';
 import { seedIfEmpty } from './utils/seed';
 import { downloadText, exportBackupJson } from './utils/export';
+import { useBirdStore } from './stores/birdStore';
 import { useRingStore } from './stores/ringStore';
 import { useMeasureStore } from './stores/measureStore';
 import { useSiteStore } from './stores/siteStore';
@@ -12,6 +13,7 @@ import { useSessionStore } from './stores/sessionStore';
 import { useAmap } from './hooks/useAmap';
 
 const route = useRoute();
+const birdStore = useBirdStore();
 const ringStore = useRingStore();
 const measureStore = useMeasureStore();
 const siteStore = useSiteStore();
@@ -28,7 +30,7 @@ onMounted(async () => {
   }
   try {
     await seedIfEmpty();
-    await Promise.all([ringStore.hydrate(), measureStore.hydrate(), siteStore.hydrate(), sessionStore.hydrate()]);
+    await Promise.all([birdStore.hydrate(), ringStore.hydrate(), measureStore.hydrate(), siteStore.hydrate(), sessionStore.hydrate()]);
   } catch (error) {
     ElMessage.error(`本地数据装载失败：${(error as Error).message}`);
   } finally {

@@ -4,9 +4,11 @@ export type BirdAge = '幼' | '亚成' | '成';
 /** 环志状态 */
 export type RingStatus = '初捕' | '重捕' | '回收';
 
-/** 环志记录 */
+/** 环志记录：一次捕获事件（初捕 / 重捕 / 回收），归属于一个个体主档 */
 export interface RingRecord {
   id: string;
+  /** 所属个体主档 id */
+  birdId: string;
   /** 金属环号 */
   ringNo: string;
   /** 彩环组合（可空） */
@@ -49,3 +51,8 @@ export const STATUS_COLOR: Record<RingStatus, string> = {
   重捕: 'warning',
   回收: 'danger',
 };
+
+/** 环号归一化：去空白 + 大小写不敏感，用于同一只鸟的个体链匹配 */
+export function normalizeRingNo(ringNo: string): string {
+  return ringNo.trim().toLowerCase();
+}

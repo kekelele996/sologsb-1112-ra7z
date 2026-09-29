@@ -1,6 +1,7 @@
 import type { MeasureDeviation, MeasureKey, Morphometrics } from '../types/morphometrics';
 import { MEASURE_FIELDS } from '../types/morphometrics';
 import type { RingRecord, RingStatus } from '../types/ring-record';
+import type { Bird } from '../types/bird';
 import type { SessionStats, SurveySession } from '../types/session';
 
 /** 常见环志鸟种目录（中文名 + 学名），供 SpeciesPicker 联想与自定义补充 */
@@ -43,15 +44,40 @@ export function speciesOf(ring: RingRecord): { cn: string; sci: string } {
   return { cn: ring.speciesCn, sci: ring.speciesSci };
 }
 
-/** 鸟种计数（按记录数降序） */
-export function speciesCount(records: RingRecord[]): Array<{ speciesCn: string; speciesSci: string; count: number }> {
-  const map = new Map<string, { speciesCn: string; speciesSci: string; count: number }>();
+/**
+ * 鸟种计数：
+ * - 个体数按主档去重（同一只鸟的初捕 / 重捕 / 回收只计一个个体）
+ * - 捕获数按事件计（每次捕获都计）
+ */
+export function speciesCount(
+  records: RingRecord[],
+  birds: Bird[] = [],
+): Array<{ speciesCn: string; speciesSci: string; individualCount: number; eventCount: number; count: number }> {
+  const map = new Map<
+    string,
+    { speciesCn: string; speciesSci: string; birds: Set<string>; eventCount: number }
+  >();
   records.forEach((record) => {
-    const item = map.get(record.speciesCn) ?? { speciesCn: record.speciesCn, speciesSci: record.speciesSci, count: 0 };
-    item.count += 1;
+    const item =
+      map.get(record.speciesCn) ??
+      { speciesCn: record.speciesCn, speciesSci: record.speciesSci, birds: new Set<string>(), eventCount: 0 };
+    item.eventCount += 1;
+    if (record.birdId) item.birds.add(record.birdId);
     map.set(record.speciesCn, item);
   });
-  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  return Array.from(map.values())
+    .map((item) => {
+      const individualCount = item.birds.size;
+      return {
+        speciesCn: item.speciesCn,
+        speciesSci: item.speciesSci,
+        individualCount,
+        eventCount: item.eventCount,
+        // 兼容旧数据：事件尚未挂主档时回退为事件数
+        count: individualCount || item.eventCount,
+      };
+    })
+    .sort((a, b) => b.individualCount - a.individualCount || b.eventCount - a.eventCount);
 }
 
 /** 状态分布 */
@@ -71,7 +97,7 @@ export function recaptureRate(records: RingRecord[]): number {
   return base > 0 ? Number(((recaptured / base) * 100).toFixed(1)) : 0;
 }
 
-/** 批次统计：鸟种数、初捕数与重捕数 */
+/** 批次统计：鸟种数、捕获数（按事件）与个体数（同一只鸟只计一个） */
 export function buildSessionStats(session: SurveySession, records: RingRecord[], siteName: string): SessionStats {
   const scoped = records.filter((record) => record.sessionId === session.id);
   const breakdown = statusBreakdown(scoped);
@@ -83,6 +109,7 @@ export function buildSessionStats(session: SurveySession, records: RingRecord[],
     firstCount: breakdown.初捕,
     recaptureCount: breakdown.重捕,
     recoveryCount: breakdown.回收,
+    individualCount: new Set(scoped.map((record) => record.birdId).filter(Boolean)).size,
     recaptureRate: base > 0 ? Number(((breakdown.重捕 / base) * 100).toFixed(1)) : 0,
   };
 }
